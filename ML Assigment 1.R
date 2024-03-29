@@ -8,57 +8,56 @@ library(tidymodels)
 library(janitor)
 
 # Read in the data
-students <- read_csv("studentInfo.csv")
+student_data <- read_csv("studentInfo.csv")
 
 # Mutate variables
-students <- students %>%
-  mutate(pass = ifelse(final_result == "Pass", 1, 0)) %>%
-  mutate(pass = as.factor(pass))
+student_data <- student_data %>%
+  mutate(pass_status = ifelse(final_result == "Pass", 1, 0)) %>%
+  mutate(pass_status = as.factor(pass_status))
 
-students <- students %>%
-  mutate(disability = as.factor(disability))
+student_data <- student_data %>%
+  mutate(disability_status = as.factor(disability))
 
 # Examine the data
-students
+student_data
 
 # Feature engineering
-students <- students %>%
+student_data <- student_data %>%
   mutate(imd_band = factor(imd_band, levels = c("0-10%", "10-20%", "20-30%", "30-40%", "40-50%", "50-60%", "60-70%", "70-80%", "80-90%", "90-100%"))) %>%
-  mutate(imd_band = as.integer(imd_band))
+  mutate(imd_band_numeric = as.integer(imd_band))
 
 # Split data
 set.seed(20230712)
-train_test_split <- initial_split(students, prop = 0.80)
-data_train <- training(train_test_split)
-data_test <- testing(train_test_split)
+train_test_split <- initial_split(student_data, prop = 0.80)
+train_data <- training(train_test_split)
+test_data <- testing(train_test_split)
 
 # Create a recipe
-my_rec <- recipe(pass ~ disability + imd_band, data = data_train)
+student_recipe <- recipe(pass_status ~ disability_status + imd_band_numeric, data = train_data)
 
 # Specify the model
-my_mod <- 
+logistic_model <- 
   logistic_reg() %>% 
   set_engine("glm") %>% 
   set_mode("classification")
 
 # Add model and recipe to workflow
-my_wf <- 
+student_workflow <- 
   workflow() %>% 
-  add_model(my_mod) %>% 
-  add_recipe(my_rec)
+  add_model(logistic_model) %>% 
+  add_recipe(student_recipe)
 
 # Fit model
-fitted_model <- fit(my_wf, data = data_train)
+fitted_student_model <- fit(student_workflow, data = train_data)
 
 # Create a resampling object for the testing data
-test_split <- rsample::initial_split(data_test, prop = 0.8)
+test_split <- rsample::initial_split(test_data, prop = 0.8)
 
 # Fit the model using the testing data
-final_fit <- last_fit(my_wf, split = test_split)
+final_fit <- last_fit(student_workflow, split = test_split)
 
 # View the final fitted model
 final_fit
-
 
 # Collect predictions
 final_fit %>%
@@ -67,9 +66,8 @@ final_fit %>%
 # Interpret accuracy
 final_fit %>%
   collect_predictions() %>%
-  select(.pred_class, pass) %>%
-  mutate(correct = .pred_class == pass) %>%
-  tabyl(correct)
+  select(.pred_class, pass_status) %>%
+  mutate(correct_prediction = .pred_class == pass_status) %>%
+  tabyl(correct_prediction)
 
 # Wrap up and knit the document
-
